@@ -8,16 +8,14 @@ const server = createServer(app);
 
 const io = new Server(3000, {
     cors: {
-        origin: "http://localhost:3000", // Reemplaza con la URL de tu frontend
+        origin: "http://localhost:3001", // Reemplaza con la URL de tu frontend
         methods: ["GET", "POST"],
     },
 });
 
 const rooms = {}; // Almacenará las salas en memoria
 
-app.get('/', (req, res) => {
-    res.send('<h1>Hello world</h1>');
-});
+
 io.on("connection", (socket) => {
     console.log("Nuevo cliente conectado:", socket.id);
 
@@ -40,7 +38,18 @@ io.on("connection", (socket) => {
         console.log(`Sala creada: ${roomId}`);
         socket.emit("room-created", roomId); // Confirma al creador que la sala está lista
     });
+    socket.on("join-room", (roomId) => {
+        if (!rooms[roomId]) {
+            socket.emit("error", "La sala no existe.");
+            return;
+        }
 
+        rooms[roomId].users.push(socket.id);
+        socket.join(roomId)
+        console.log(`Usuario ${socket.id} se unió a la sala ${roomId}`)
+        socket.emit("room-joined", roomId)
+        io.to(roomId).emit("update-users", rooms[roomId].users)
+    })
 
 
 
@@ -102,15 +111,20 @@ io.on("connection", (socket) => {
             }
         }
     })
-    socket.on("create-room", (roomId) => {
-        socket.join(roomId); // El cliente se une a la sala.
-        console.log(`Sala ${roomId} creada y usuario conectado.`);
+    socket.on("disconnect", () => {
+        console.log(`Usuario desconectado: ${socket.id}`);
+
+        // Elimina al usuario de las salas en las que estaba
+        for (const roomId in rooms) {
+            const room = rooms[roomId];
+            room.users = room.users.filter((userId) => userId !== socket.id);
+
+            if (room.users.length === 0) {
+                delete rooms[roomId]; // Elimina la sala si no quedan usuarios
+                console.log(`Sala eliminada: ${roomId}`);
+            } else {
+                io.to(roomId).emit("update-users", room.users); // Notifica la actualización de usuarios
+            }
+        }
     });
-    socket.on("join-room", (roomId) => {
-        socket.join(roomId);
-        console.log(`Usuario se unió a la sala ${roomId}`);
-    });
-});
-server.listen(3000, () => {
-    console.log('listening on *:3000');
 });
