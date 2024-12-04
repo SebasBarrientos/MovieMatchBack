@@ -1,20 +1,22 @@
 const express = require('express');
 const { createServer } = require('node:http');
-const { join } = require('node:path');
 const { Server } = require('socket.io');
-
 const app = express();
 const server = createServer(app);
+const APICall = require('./apiCall.js')
 
-const io = new Server(3000, {
+require("dotenv").config();
+const { PORT } = process.env;
+
+
+const io = new Server(PORT, {
     cors: {
         origin: "http://localhost:3001", // Reemplaza con la URL de tu frontend
         methods: ["GET", "POST"],
     },
 });
 
-const rooms = {}; // Almacenará las salas en memoria
-
+const rooms = {}; 
 
 io.on("connection", (socket) => {
     console.log("Nuevo cliente conectado:", socket.id);
@@ -36,7 +38,7 @@ io.on("connection", (socket) => {
 
         socket.join(roomId); // Une al creador a la sala
         console.log(`Sala creada: ${roomId}`);
-        socket.emit("room-created", roomId); // Confirma al creador que la sala está lista
+        socket.emit("room-created", { success: true, roomId }); // Confirma al creador que la sala está lista
     });
     socket.on("join-room", (roomId) => {
         if (!rooms[roomId]) {
@@ -76,6 +78,7 @@ io.on("connection", (socket) => {
             if (commonCategories.length > 0) {
                 const selectedCategory = commonCategories[0]; // Elige la primera categoría común
                 room.selectedCategory = selectedCategory;
+                APICall(selectedCategory)
                 io.to(roomId).emit("category-match", selectedCategory);
             } else {
                 io.to(roomId).emit("no-category-match");
