@@ -16,7 +16,7 @@ const io = new Server(PORT, {
     },
 });
 
-const rooms = {}; 
+const rooms = {};
 
 io.on("connection", (socket) => {
     console.log("Nuevo cliente conectado:", socket.id);
@@ -43,14 +43,22 @@ io.on("connection", (socket) => {
     socket.on("join-room", (roomId) => {
         if (!rooms[roomId]) {
             socket.emit("error", "La sala no existe.");
+            
             return;
         }
 
-        rooms[roomId].users.push(socket.id);
+        if (!rooms[roomId].users.includes(socket.id)) {
+            rooms[roomId].users.push(socket.id);
+            console.log(`Usuario ${socket.id} se unió a la sala ${roomId}`);
+        } else {
+            console.log(`Usuario ${socket.id} ya está en la sala ${roomId}`);
+        }
+        console.log(rooms[roomId].users);
+
         socket.join(roomId)
         console.log(`Usuario ${socket.id} se unió a la sala ${roomId}`)
-        socket.emit("room-joined", roomId)
-        io.to(roomId).emit("update-users", rooms[roomId].users)
+        socket.emit("room-joined", { success: true, roomId })
+        io.to(roomId).emit("update-users", rooms[roomId].users) //ver como hago esto en el front
     })
 
 
