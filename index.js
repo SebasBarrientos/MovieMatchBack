@@ -1,8 +1,4 @@
-const express = require('express');
-const { createServer } = require('node:http');
 const { Server } = require('socket.io');
-const app = express();
-const server = createServer(app);
 const APICall = require('./apiCall.js')
 
 require("dotenv").config();
@@ -43,10 +39,10 @@ io.on("connection", (socket) => {
     socket.on("join-room", (roomId) => {
         if (!rooms[roomId]) {
             socket.emit("error", "La sala no existe.");
-            
+
             return;
         }
-        
+
         if (!rooms[roomId].users.includes(socket.id)) {
             rooms[roomId].users.push(socket.id);
             console.log(`Usuario ${socket.id} se unió a la sala ${roomId}`);
@@ -54,28 +50,29 @@ io.on("connection", (socket) => {
             console.log(`Usuario ${socket.id} ya está en la sala ${roomId}`);
         }
         console.log(rooms[roomId].users);
-        
+
         socket.join(roomId)
         console.log(`Usuario ${socket.id} se unió a la sala ${roomId}`)
-        const room =rooms[roomId]
+        const room = rooms[roomId]
         socket.emit("room-joined", { success: true, roomId, room })
-        io.to(roomId).emit("update-users", rooms[roomId].users) 
+        io.to(roomId).emit("update-users", rooms[roomId].users)
     })
     socket.on("ready", (roomId) => {
         console.log(roomId);
-        
+
         if (!rooms[roomId]) {
             socket.emit("error", "La sala no existe.");
-            
+
             return;
         }
-        io.to(roomId).emit("users-ready", roomId) 
+        io.to(roomId).emit("users-ready", roomId)
     })
 
+    socket.on("select-categories",async ({ roomId, userId, categories }) =>  {
+        console.log("room", roomId);
+        console.log("usuario", userId);
+        console.log("categorias", categories);
 
-
-
-    socket.on("select-categories", ({ roomId, userId, categories }) => {
         const room = rooms[roomId];
         if (!room) return;
 
@@ -84,6 +81,7 @@ io.on("connection", (socket) => {
         // Verifica si todos han enviado sus selecciones
         if (Object.keys(room.categorySelections).length === room.users.length) {
             // Encuentra las categorías comunes
+
             const allSelections = Object.values(room.categorySelections).flat();
             const categoryCount = allSelections.reduce((acc, category) => {
                 acc[category] = (acc[category] || 0) + 1;
@@ -97,9 +95,15 @@ io.on("connection", (socket) => {
             if (commonCategories.length > 0) {
                 const selectedCategory = commonCategories[0]; // Elige la primera categoría común
                 room.selectedCategory = selectedCategory;
-                APICall(selectedCategory)
-                io.to(roomId).emit("category-match", selectedCategory);
+
+                const apiAnswer = await APICall(selectedCategory)
+                const {results} = apiAnswer
+                console.log("resultadoss",results);
+                
+
+                io.to(roomId).emit("category-match", { selectedCategory, results });
             } else {
+
                 io.to(roomId).emit("no-category-match");
             }
         }
