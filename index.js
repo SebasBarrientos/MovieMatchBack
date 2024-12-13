@@ -25,11 +25,11 @@ io.on("connection", (socket) => {
         }
 
         rooms[roomId] = {
-            users: [socket.id], // Almacena los usuarios de la sala
-            categorySelections: {}, // Almacena las categorías seleccionadas por usuario
-            votes: {}, // Almacena los votos por película
-            currentIndex: 0, // Índice de la película actual
-            movies: [], // Listado de películas para la sala
+            users: [socket.id],
+            categorySelections: {},
+            votes: {},
+            currentIndex: 0,
+            //agregar paginacion aca con un indice de paginacion y cuando llegue el no more movies se vuelve a ejecutar la apical con la paginacion ++
         };
 
         socket.join(roomId); // Une al creador a la sala
@@ -68,7 +68,7 @@ io.on("connection", (socket) => {
         io.to(roomId).emit("users-ready", roomId)
     })
 
-    socket.on("select-categories",async ({ roomId, userId, categories }) =>  {
+    socket.on("select-categories", async ({ roomId, userId, categories }) => {
         console.log("room", roomId);
         console.log("usuario", userId);
         console.log("categorias", categories);
@@ -97,9 +97,8 @@ io.on("connection", (socket) => {
                 room.selectedCategory = selectedCategory;
 
                 const apiAnswer = await APICall(selectedCategory)
-                const {results} = apiAnswer
-                console.log("resultadoss",results);
-                
+                const { results } = apiAnswer
+
 
                 io.to(roomId).emit("category-match", { selectedCategory, results });
             } else {
@@ -111,30 +110,37 @@ io.on("connection", (socket) => {
     socket.on("vote-movie", ({ roomId, vote }) => {
         const room = rooms[roomId];
         if (!room) return;
+        console.log("HOOLAAAAAAAAA", vote);
+        if (vote === "dislike") {
 
+            // Avanza a la siguiente película
+            room.currentIndex++;
+            console.log(room.currentIndex);
+            
+            if (room.currentIndex < 20) {
+                room.votes = {};
+                index = room.currentIndex
+                console.log("Se envia");
+                
+                io.to(roomId).emit("next-movie", index);
+                return
+            } else {
+                io.to(roomId).emit("no-more-movies");
+                room.currentIndex = 0
+            }
+        }
         // Registra el voto
         room.votes[socket.id] = vote;
 
-        // Verifica si todos han votado
         if (Object.keys(room.votes).length === room.users.length) {
-            const allVotes = Object.values(room.votes);
+            // const allVotes = Object.values(room.votes);
 
-            if (allVotes.every((v) => v === "like")) {
-                // Match encontrado
-                const matchedMovie = room.movies[room.currentIndex];
-                io.to(roomId).emit("match-found", matchedMovie);
-                delete rooms[roomId]; // Limpia la sala
-            } else {
-                // Avanza a la siguiente película
-                room.currentIndex++;
-                if (room.currentIndex < room.movies.length) {
-                    room.votes = {}; // Resetea los votos
-                    const nextMovie = room.movies[room.currentIndex];
-                    io.to(roomId).emit("next-movie", nextMovie);
-                } else {
-                    io.to(roomId).emit("no-more-movies");
-                }
-            }
+            // if (allVotes.every((v) => v === "like")) {
+            //     // Match encontrado
+            index = room.currentIndex
+
+            io.to(roomId).emit("match-found", index);
+            delete rooms[roomId]; // Limpia la sala
         }
     })
     socket.on("disconnect", () => {
