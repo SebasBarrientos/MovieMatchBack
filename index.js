@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const APICall = require('./apiCall.js')
-
+const movieProviders = require ('./movieProviders.js');
+const getMovieDetails = require('./movieDetails.js');
 require("dotenv").config();
 const { PORT } = process.env;
 
@@ -16,7 +17,6 @@ const rooms = {};
 
 io.on("connection", (socket) => {
     console.log("Nuevo cliente conectado:", socket.id);
-
     // Crear una sala
     socket.on("create-room", (roomId) => {
         if (rooms[roomId]) {
@@ -29,6 +29,8 @@ io.on("connection", (socket) => {
             categorySelections: {},
             votes: {},
             currentIndex: 0,
+            ApiIndex: 1,
+            chosenMovie: null
             //agregar paginacion aca con un indice de paginacion y cuando llegue el no more movies se vuelve a ejecutar la apical con la paginacion ++
         };
 
@@ -69,10 +71,6 @@ io.on("connection", (socket) => {
     })
 
     socket.on("select-categories", async ({ roomId, userId, categories }) => {
-        console.log("room", roomId);
-        console.log("usuario", userId);
-        console.log("categorias", categories);
-
         const room = rooms[roomId];
         if (!room) return;
 
@@ -95,8 +93,9 @@ io.on("connection", (socket) => {
             if (commonCategories.length > 0) {
                 const selectedCategory = commonCategories[0]; // Elige la primera categoría común
                 room.selectedCategory = selectedCategory;
-
-                const apiAnswer = await APICall(selectedCategory)
+                console.log(selectedCategory);
+                
+                const apiAnswer = await APICall(selectedCategory, room.ApiIndex)
                 const { results } = apiAnswer
 
 
@@ -107,26 +106,33 @@ io.on("connection", (socket) => {
             }
         }
     });
-    socket.on("vote-movie", ({ roomId, vote }) => {
+    socket.on("vote-movie", async ({ roomId, vote }) => {
         const room = rooms[roomId];
+
         if (!room) return;
-        console.log("HOOLAAAAAAAAA", vote);
         if (vote === "dislike") {
 
             // Avanza a la siguiente película
             room.currentIndex++;
             console.log(room.currentIndex);
-            
+
             if (room.currentIndex < 20) {
                 room.votes = {};
                 index = room.currentIndex
                 console.log("Se envia");
-                
+
                 io.to(roomId).emit("next-movie", index);
                 return
             } else {
-                io.to(roomId).emit("no-more-movies");
+                const selectedCategory = room.selectedCategory
+                room.ApiIndex++
+                room.votes = {}
+                ApiIndex = room.ApiIndex
                 room.currentIndex = 0
+                const apiAnswer = await APICall(selectedCategory, ApiIndex)
+                const { results } = apiAnswer
+                io.to(roomId).emit("no-more-movies", { results, index: room.currentIndex });
+                return
             }
         }
         // Registra el voto
@@ -140,9 +146,50 @@ io.on("connection", (socket) => {
             index = room.currentIndex
 
             io.to(roomId).emit("match-found", index);
-            delete rooms[roomId]; // Limpia la sala
+
+
+
+
+            // delete rooms[roomId]; // Limpia la sala              Mover 
         }
     })
+    socket.on("movie-providers", async ({ roomId, movieId }) => {
+        const room = rooms[roomId];
+        if (!room) return;
+        console.log(movieId);
+        
+        const providers = await movieProviders(movieId) 
+        if (providers) {
+            console.log(providers);
+            
+            io.to(roomId).emit("movie-providers", {success: true, providers});
+
+        } else {
+            console.log("Error buscando proveedores");
+            
+        }
+    })
+
+    socket.on("movie-details", async ({ roomId, movieId }) => {
+        const room = rooms[roomId];
+        if (!room) return;
+        console.log(movieId);
+        
+        const movieDetails = await getMovieDetails(movieId) 
+        if (movieDetails) {
+            console.log(movieDetails);
+            
+            io.to(roomId).emit("movie-details", {success: true, movieDetails});
+
+        } else {
+            console.log("Error buscando proveedores");
+            
+        }
+    })
+
+
+
+
     socket.on("disconnect", () => {
         console.log(`Usuario desconectado: ${socket.id}`);
 
@@ -158,5 +205,8 @@ io.on("connection", (socket) => {
                 io.to(roomId).emit("update-users", room.users); // Notifica la actualización de usuarios
             }
         }
-    });
+    }
+)
+// socket.disconnect(true)   //Usar solo si quedan trabadas las conecciones
+
 });
