@@ -8,7 +8,7 @@ const { PORT } = process.env;
 
 const io = new Server(PORT, {
     cors: {
-        origin: "http://localhost:3000", // Reemplaza con la URL de tu frontend
+        origin: "*", // Reemplaza con la URL de tu frontend
         methods: ["GET", "POST"],
     },
 });
@@ -16,6 +16,8 @@ const io = new Server(PORT, {
 const rooms = {};
 
 io.on("connection", (socket) => {
+    console.log("come");
+    
     // Crear una sala
     socket.on("create-room", (roomId) => {
         if (rooms[roomId]) {
