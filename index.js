@@ -16,7 +16,6 @@ const io = new Server(PORT, {
 const rooms = {};
 
 io.on("connection", (socket) => {
-    console.log("come");
     
     // Crear una sala
     socket.on("create-room", (roomId) => {

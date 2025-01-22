@@ -12,7 +12,6 @@ module.exports = async function movieProviders(movieId) {
 
   try {
     const response = await axios.get(url, { headers });
-    console.log("Data de la peli",response.data.results);
     return response.data;
   } catch (error) {
     console.error('Error fetching data:', error);
