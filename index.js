@@ -69,7 +69,6 @@ io.on("connection", (socket) => {
         if (!room) return;
 
         room.categorySelections[userId] = categories;
-        console.log(room.categorySelections);
         
         // Verifica si todos han enviado sus selecciones
         if (Object.keys(room.categorySelections).length === room.users.length) {
