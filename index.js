@@ -1,22 +1,22 @@
 const { Server } = require('socket.io');
 const APICall = require('./apiCall.js')
-const movieProviders = require ('./movieProviders.js');
+const movieProviders = require('./movieProviders.js');
 const getMovieDetails = require('./movieDetails.js');
 require("dotenv").config();
 const { PORT } = process.env;
 
-
 const io = new Server(PORT, {
+    pingTimeout: 25000,
     cors: {
         origin: "*", // Reemplaza con la URL de tu frontend
         methods: ["GET", "POST"],
     },
 });
 
+
 const rooms = {};
 
 io.on("connection", (socket) => {
-    
     // Crear una sala
     socket.on("create-room", (roomId) => {
         if (rooms[roomId]) {
@@ -65,38 +65,43 @@ io.on("connection", (socket) => {
     })
 
     socket.on("select-categories", async ({ roomId, userId, categories }) => {
-        const room = rooms[roomId];
-        if (!room) return;
+        try {
+            const room = rooms[roomId];
+            if (!room) return;
 
-        room.categorySelections[userId] = categories;
-        
-        // Verifica si todos han enviado sus selecciones
-        if (Object.keys(room.categorySelections).length === room.users.length) {
-            // Encuentra las categorías comunes
+            room.categorySelections[userId] = categories;
 
-            const allSelections = Object.values(room.categorySelections).flat();
-            const categoryCount = allSelections.reduce((acc, category) => {
-                acc[category] = (acc[category] || 0) + 1;
-                return acc;
-            }, {});
+            // Verifica si todos han enviado sus selecciones
+            if (Object.keys(room.categorySelections).length === room.users.length) {
+                // Encuentra las categorías comunes
 
-            const commonCategories = Object.entries(categoryCount)
-                .filter(([_, count]) => count === room.users.length)
-                .map(([category]) => category);
+                const allSelections = Object.values(room.categorySelections).flat();
+                const categoryCount = allSelections.reduce((acc, category) => {
+                    acc[category] = (acc[category] || 0) + 1;
+                    return acc;
+                }, {});
 
-            if (commonCategories.length > 0) {
-                const selectedCategory = commonCategories[0]; // Elige la primera categoría común
-                room.selectedCategory = selectedCategory;
-                
-                const apiAnswer = await APICall(selectedCategory, room.ApiIndex)
-                const { results } = apiAnswer
+                const commonCategories = Object.entries(categoryCount)
+                    .filter(([_, count]) => count === room.users.length)
+                    .map(([category]) => category);
+
+                if (commonCategories.length > 0) {
+                    const selectedCategory = commonCategories[0]; // Elige la primera categoría común
+                    room.selectedCategory = selectedCategory;
+
+                    const apiAnswer = await APICall(selectedCategory, room.ApiIndex)
+                    const { results } = apiAnswer
 
 
-                io.to(roomId).emit("category-match", { selectedCategory, results });
-            } else {
-                room.categorySelections = {}
-                io.to(roomId).emit("no-category-match");
+                    io.to(roomId).emit("category-match", { selectedCategory, results });
+                } else {
+                    room.categorySelections = {}
+                    io.to(roomId).emit("no-category-match");
+                }
             }
+        } catch (error) {
+            console.error("Error en select-categories:", error);
+            socket.emit("error", "Error interno del servidor");
         }
     });
     socket.on("vote-movie", async ({ roomId, vote }) => {
@@ -137,50 +142,43 @@ io.on("connection", (socket) => {
             index = room.currentIndex
 
             io.to(roomId).emit("match-found", index);
-
-
-
-
             // delete rooms[roomId]; // Limpia la sala              Mover 
         }
     })
     socket.on("movie-providers", async ({ roomId, movieId }) => {
         const room = rooms[roomId];
         if (!room) return;
-        
-        const providers = await movieProviders(movieId) 
+
+        const providers = await movieProviders(movieId)
         if (providers) {
-            
-            io.to(roomId).emit("movie-providers", {success: true, providers});
+
+            io.to(roomId).emit("movie-providers", { success: true, providers });
 
         } else {
-            
+
         }
     })
 
     socket.on("movie-details", async ({ roomId, movieId }) => {
         const room = rooms[roomId];
         if (!room) return;
-        
-        const movieDetails = await getMovieDetails(movieId) 
+
+        const movieDetails = await getMovieDetails(movieId)
         if (movieDetails) {
-            
-            io.to(roomId).emit("movie-details", {success: true, movieDetails});
+
+            io.to(roomId).emit("movie-details", { success: true, movieDetails });
 
         } else {
-            
+
         }
     })
 
-
-
-
     socket.on("disconnect", () => {
-
+        const disconectedUser = socket.id
         // Elimina al usuario de las salas en las que estaba
         for (const roomId in rooms) {
             const room = rooms[roomId];
-            room.users = room.users.filter((userId) => userId !== socket.id);
+            room.users = room.users.filter((user) => user !== disconectedUser);
 
             if (room.users.length === 0) {
                 delete rooms[roomId]; // Elimina la sala si no quedan usuarios
@@ -189,7 +187,7 @@ io.on("connection", (socket) => {
             }
         }
     }
-)
-// socket.disconnect(true)   //Usar solo si quedan trabadas las conecciones
+    )
+    // socket.disconnect(true)   //Usar solo si quedan trabadas las conecciones
 
 });
