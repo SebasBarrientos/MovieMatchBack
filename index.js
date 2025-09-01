@@ -13,7 +13,6 @@ const io = new Server(PORT, {
     },
 });
 
-
 const rooms = {};
 
 io.on("connection", (socket) => {
