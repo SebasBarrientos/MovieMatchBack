@@ -8,7 +8,7 @@ const { PORT } = process.env;
 const io = new Server(PORT, {
     pingTimeout: 25000,
     cors: {
-        origin: "https://movie-match-app-front-636823811734.europe-southwest1.run.app", // Reemplaza con la URL de tu frontend
+        origin: "https://moviematch-636823811734.europe-west1.run.app", // Reemplaza con la URL de tu frontend
         methods: ["GET", "POST"],
     },
 });
